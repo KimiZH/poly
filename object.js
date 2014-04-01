@@ -131,6 +131,9 @@ define(function (require) {
 		'object-defineproperties-dom': function () {
 			return doc && hasDefineProperties(testEl);
 		},
+		'object-defineproperties-prototype': function () {
+			return hasDefinePropertiesPrototype(function () {});
+		},
 		'object-getownpropertydescriptor-obj': function () {
 			return hasGetOwnPropertyDescriptor({});
 		},
@@ -196,6 +199,10 @@ define(function (require) {
 				? useNativeForDom(Object.defineProperties, defineProperties)
 				: defineProperties;
 	}
+	else if (!has('object-defineproperties-prototype')) {
+		Object.defineProperties = shims.defineProperties
+			= defineProperties;
+	}
 
 	if (!has('object-defineproperty-obj')) {
 		// check if dom has it (IE8)
@@ -240,6 +247,17 @@ define(function (require) {
 				// test it
 				Object.defineProperties(object, { 'sentinel2': { value: 1 } })
 				return 'sentinel2' in object;
+			}
+			catch (ex) { /* squelch */ }
+		}
+	}
+
+	function hasDefinePropertiesPrototype(fn) {
+		if (('defineProperties' in Object)) {
+			try {
+				// test it
+				Object.defineProperties(fn, { 'prototype': { value: { test: true } } })
+				return (new fn).test === true && fn.prototype.test === true;
 			}
 			catch (ex) { /* squelch */ }
 		}
