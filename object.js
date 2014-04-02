@@ -67,6 +67,7 @@ define(function (require) {
 		hasOwnProp = 'hasOwnProperty',
 		doc = typeof document != 'undefined' && document,
 		testEl = doc && doc.createElement('p'),
+		testFn = function () {},
 		undef;
 
 	refObj = Object;
@@ -125,14 +126,17 @@ define(function (require) {
 		'object-defineproperty-dom': function () {
 			return doc && hasDefineProperty(testEl);
 		},
+		'object-defineproperty-function-prototype': function () {
+			return hasDefinePropertyFunctionPrototype(testFn);
+		},
 		'object-defineproperties-obj': function () {
 			return hasDefineProperties({});
 		},
 		'object-defineproperties-dom': function () {
 			return doc && hasDefineProperties(testEl);
 		},
-		'object-defineproperties-prototype': function () {
-			return hasDefinePropertiesPrototype(function () {});
+		'object-defineproperties-function-prototype': function () {
+			return hasDefinePropertiesFunctionPrototype(testFn);
 		},
 		'object-getownpropertydescriptor-obj': function () {
 			return hasGetOwnPropertyDescriptor({});
@@ -199,7 +203,7 @@ define(function (require) {
 				? useNativeForDom(Object.defineProperties, defineProperties)
 				: defineProperties;
 	}
-	else if (!has('object-defineproperties-prototype')) {
+	else if (!has('object-defineproperties-function-prototype')) {
 		Object.defineProperties = shims.defineProperties
 			= defineProperties;
 	}
@@ -210,6 +214,10 @@ define(function (require) {
 			= has('object-defineproperty-dom')
 				? useNativeForDom(Object.defineProperty, defineProperty)
 				: defineProperty;
+	}
+	else if (!has('object-defineproperty-function-prototype')) {
+		Object.defineProperty = shims.defineProperty
+			= definePropertyFunctionPrototype;
 	}
 
 	if (!has('object-isextensible')) {
@@ -239,6 +247,17 @@ define(function (require) {
 		}
 	}
 
+	function hasDefinePropertyFunctionPrototype(fn) {
+		if (('defineProperty' in Object)) {
+			try {
+				// test it
+				Object.defineProperty(fn, { 'prototype': { value: { test: true } } })
+				return (new fn).test === true && fn.prototype.test === true;
+			}
+			catch (ex) { /* squelch */ }
+		}
+	}
+
 	// Note: MSDN docs say that IE8 has this function, but tests show
 	// that it does not! JMH
 	function hasDefineProperties (object) {
@@ -252,7 +271,7 @@ define(function (require) {
 		}
 	}
 
-	function hasDefinePropertiesPrototype(fn) {
+	function hasDefinePropertiesFunctionPrototype(fn) {
 		if (('defineProperties' in Object)) {
 			try {
 				// test it
@@ -328,6 +347,23 @@ define(function (require) {
 
 	function defineProperty (object, name, descriptor) {
 		object[name] = descriptor && descriptor.value;
+		return object;
+	}
+
+	function definePropertyFunctionPrototype (object, name, descriptor) {
+		if (name == 'prototype') {
+			if (object[name] && typeof(object[name]) == 'object' && descriptor && descriptor.value && typeof(descriptor.value) == 'object') {
+				for (var i in descriptor.value) {
+					object[name][i] = descriptor.value[i];
+				}
+			}
+			else {
+				object[name] = descriptor && descriptor.value;
+			}
+		}
+		else {
+			Object.defineProperty.apply(Object, arguments);
+		}
 		return object;
 	}
 
