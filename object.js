@@ -67,7 +67,6 @@ define(function (require) {
 		hasOwnProp = 'hasOwnProperty',
 		doc = typeof document != 'undefined' && document,
 		testEl = doc && doc.createElement('p'),
-		testFn = function () {},
 		undef;
 
 	refObj = Object;
@@ -121,22 +120,22 @@ define(function (require) {
 		'object-isextensible': 'isExtensible',
 		'object-preventextensions': 'preventExtensions',
 		'object-defineproperty-obj': function () {
-			return hasDefineProperty({});
+			return hasDefineProperty({}, 'sentinel1', { value: true });
 		},
 		'object-defineproperty-dom': function () {
-			return doc && hasDefineProperty(testEl);
+			return doc && hasDefineProperty(testEl, 'sentinel1', { value: true });
 		},
-		'object-defineproperty-function-prototype': function () {
-			return hasDefinePropertyFunctionPrototype(testFn);
+		'object-defineproperty-function': function () {
+			return hasDefineProperty(function () {}, 'prototype', { value: { test: true } });
 		},
 		'object-defineproperties-obj': function () {
-			return hasDefineProperties({});
+			return hasDefineProperties({}, { 'sentinel2': { value: true } });
 		},
 		'object-defineproperties-dom': function () {
-			return doc && hasDefineProperties(testEl);
+			return doc && hasDefineProperties(testEl, { 'sentinel2': { value: true } });
 		},
-		'object-defineproperties-function-prototype': function () {
-			return hasDefinePropertiesFunctionPrototype(testFn);
+		'object-defineproperties-function': function () {
+			return hasDefineProperties(function () {}, { 'prototype': { value: { test: true } } });
 		},
 		'object-getownpropertydescriptor-obj': function () {
 			return hasGetOwnPropertyDescriptor({});
@@ -196,28 +195,20 @@ define(function (require) {
 			= getOwnPropertyNames;
 	}
 
-	if (!has('object-defineproperties-obj')) {
+	if (!has('object-defineproperties-obj') || !has('object-defineproperties-function')) {
 		// check if dom has it (IE8)
 		Object.defineProperties = shims.defineProperties
 			= has('object-defineproperties-dom')
 				? useNativeForDom(Object.defineProperties, defineProperties)
 				: defineProperties;
 	}
-	else if (!has('object-defineproperties-function-prototype')) {
-		Object.defineProperties = shims.defineProperties
-			= defineProperties;
-	}
 
-	if (!has('object-defineproperty-obj')) {
+	if (!has('object-defineproperty-obj') || !has('object-defineproperty-function')) {
 		// check if dom has it (IE8)
 		Object.defineProperty = shims.defineProperty
 			= has('object-defineproperty-dom')
 				? useNativeForDom(Object.defineProperty, defineProperty)
 				: defineProperty;
-	}
-	else if (!has('object-defineproperty-function-prototype')) {
-		Object.defineProperty = shims.defineProperty
-			= definePropertyFunctionPrototype;
 	}
 
 	if (!has('object-isextensible')) {
@@ -236,23 +227,12 @@ define(function (require) {
 				: getOwnPropertyDescriptor;
 	}
 
-	function hasDefineProperty (object) {
+	function hasDefineProperty (object, prop, descriptor) {
 		if (('defineProperty' in Object)) {
 			try {
 				// test it
-				Object.defineProperty(object, 'sentinel1', { value: 1 })
-				return 'sentinel1' in object;
-			}
-			catch (ex) { /* squelch */ }
-		}
-	}
-
-	function hasDefinePropertyFunctionPrototype(fn) {
-		if (('defineProperty' in Object)) {
-			try {
-				// test it
-				Object.defineProperty(fn, { 'prototype': { value: { test: true } } })
-				return (new fn).test === true && fn.prototype.test === true;
+				Object.defineProperty(object, prop, descriptor)
+				return object[prop] === descriptor.value;
 			}
 			catch (ex) { /* squelch */ }
 		}
@@ -260,23 +240,21 @@ define(function (require) {
 
 	// Note: MSDN docs say that IE8 has this function, but tests show
 	// that it does not! JMH
-	function hasDefineProperties (object) {
-		if (('defineProperties' in Object)) {
-			try {
-				// test it
-				Object.defineProperties(object, { 'sentinel2': { value: 1 } })
-				return 'sentinel2' in object;
-			}
-			catch (ex) { /* squelch */ }
-		}
-	}
+	function hasDefineProperties (object, props) {
+		var keys, property;
 
-	function hasDefinePropertiesFunctionPrototype(fn) {
 		if (('defineProperties' in Object)) {
 			try {
 				// test it
-				Object.defineProperties(fn, { 'prototype': { value: { test: true } } })
-				return (new fn).test === true && fn.prototype.test === true;
+				Object.defineProperties(object, props);
+				keys = _keys(props);
+
+				while (property = keys.pop()) {
+					if (object[property] !== props[property].value) {
+						return false;
+					}
+				}
+				return true;
 			}
 			catch (ex) { /* squelch */ }
 		}
@@ -347,23 +325,6 @@ define(function (require) {
 
 	function defineProperty (object, name, descriptor) {
 		object[name] = descriptor && descriptor.value;
-		return object;
-	}
-
-	function definePropertyFunctionPrototype (object, name, descriptor) {
-		if (name == 'prototype') {
-			if (object[name] && typeof(object[name]) == 'object' && descriptor && descriptor.value && typeof(descriptor.value) == 'object') {
-				for (var i in descriptor.value) {
-					object[name][i] = descriptor.value[i];
-				}
-			}
-			else {
-				object[name] = descriptor && descriptor.value;
-			}
-		}
-		else {
-			Object.defineProperty.apply(Object, arguments);
-		}
 		return object;
 	}
 
