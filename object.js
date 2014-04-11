@@ -208,7 +208,9 @@ define(function (require) {
 		Object.defineProperty = shims.defineProperty
 			= has('object-defineproperty-dom')
 				? useNativeForDom(Object.defineProperty, defineProperty)
-				: defineProperty;
+				: has('object-defineproperty-function')
+					? defineProperty
+					: definePropertyFunctionPrototype;
 	}
 
 	if (!has('object-isextensible')) {
@@ -325,6 +327,10 @@ define(function (require) {
 
 	function defineProperty (object, name, descriptor) {
 		object[name] = descriptor && descriptor.value;
+		return object;
+	}
+	function definePropertyFunctionPrototype (fn, name, descriptor) {
+		fn[name] = name == 'prototype' ? Object.defineProperty.apply(this, arguments) : (descriptor && descriptor.value);
 		return object;
 	}
 
